@@ -11,6 +11,8 @@ stable-baselines3 = "*"
 shimmy = "*"
 wandb = "*"
 tensorboard = "*"
+moviepy = "*"
+imageio = "*"
 
 [dev-packages]
 

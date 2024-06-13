@@ -51,6 +51,7 @@ class AvoidTheRainEnv(gym.Env):
         self.global_episode = 0
         self.show_simulation_at_every_episode = show_simulation_at_every_episode
         self.episode_start_pos = None
+        self.episode_robot_imgs = []
 
     def step(self, action: np.ndarray):
         self.simulation_step += 1
@@ -80,10 +81,27 @@ class AvoidTheRainEnv(gym.Env):
         # but if dead, then 0
         if done:
             reward = 0
+        
+        robot_img = game.show_robot_current_image(game.robot_id)
+        robot_img = np.array(robot_img) # (480, 640, 4)
+        robot_img = robot_img.transpose(2, 0, 1) # (4, 480, 640)
+        self.episode_robot_imgs.append(robot_img)
+        wandb.log({
+            "reward": reward,
+            "distance": distance,
+        })
 
         return obs, reward, done, {}
 
     def reset(self):
+        # ---------- save the episode images to video
+        if self.episode_robot_imgs:
+            wandb.log({
+                "episode": self.global_episode,
+                "robot_imgs": wandb.Video(np.array(self.episode_robot_imgs), fps=20),
+            })
+            self.episode_robot_imgs = []
+
         # ---------- determine whether to show simulation or not
         user_dont_want_to_show_simulation = self.show_simulation_at_every_episode == -1
         should_show = self.global_episode % self.show_simulation_at_every_episode == 0
