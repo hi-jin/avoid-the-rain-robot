@@ -27,7 +27,7 @@ import numpy as np
 from enum import Enum, auto
 
 
-RAINDROP_PROB = 0.1
+TOTAL_RAIN_COUNT = 100
 
 is_already_initialized = False
 spawned_rains = []
@@ -58,6 +58,10 @@ def reset_all(render_mode: str = "human"):
     # ------------------------- spawn robot
     robot_id = create_robot([0, 0, 1])
 
+    # ------------------------- spawn rain
+    for _ in range(TOTAL_RAIN_COUNT):
+        create_rain(spawned_rains, height=np.random.randint(5, 10))
+
 
 def game_step() -> GameState:
     global spawned_rains, robot_id, plane_id
@@ -72,12 +76,11 @@ def game_step() -> GameState:
         # ---- check if rain meets plane
         contacts = p.getContactPoints(rain_id, plane_id)
         if contacts:
-            p.removeBody(rain_id)
-            spawned_rains.remove(rain_id)
+            reset_rain_pos_near_the_robot(rain_id)
 
-    # ------------------------- random rain
-    if np.random.uniform() < RAINDROP_PROB:
-        create_rain(spawned_rains)
+    # ------------------------- random rain (now will be created on initialize for better performance)
+    # if len(spawned_rains) < TOTAL_RAIN_COUNT:
+    #     create_rain(spawned_rains)
 
     return GameState.ALIVE
 
@@ -122,13 +125,22 @@ def move_robot_wheel(robot_id: str, left_wheel: float, right_wheel: float):
     )
 
 
-def create_rain(spawned_rains):
+def create_rain(spawned_rains, height=10):
     robot_pos_x = get_robot_pos(robot_id)[0]
     robot_pos_y = get_robot_pos(robot_id)[1]
     pos_x = np.random.uniform(-10, 10) + robot_pos_x
     pos_y = np.random.uniform(-10, 10) + robot_pos_y
-    rain_id = p.loadURDF("sphere2.urdf", [pos_x, pos_y, 10])
+    rain_id = p.loadURDF("sphere2.urdf", [pos_x, pos_y, height])
     spawned_rains.append(rain_id)
+
+
+def reset_rain_pos_near_the_robot(rain_id):
+    # move rain to the sky (near the robot)
+    robot_pos_x = get_robot_pos(robot_id)[0]
+    robot_pos_y = get_robot_pos(robot_id)[1]
+    pos_x = np.random.uniform(-10, 10) + robot_pos_x
+    pos_y = np.random.uniform(-10, 10) + robot_pos_y
+    p.resetBasePositionAndOrientation(rain_id, [pos_x, pos_y, 10], [0, 0, 0, 1])
 
 
 def update_camera(robot_id):
