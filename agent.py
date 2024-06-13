@@ -50,8 +50,8 @@ class AvoidTheRainEnv(gym.Env):
         # --------- my variables
         self.global_episode = 0
         self.show_simulation_at_every_episode = show_simulation_at_every_episode
-        self.episode_start_pos = None
         self.episode_robot_imgs = []
+        self.episode_rewards = []
 
     def step(self, action: np.ndarray):
         self.simulation_step += 1
@@ -74,22 +74,20 @@ class AvoidTheRainEnv(gym.Env):
             case game.GameState.DEAD:
                 done = True
 
-        # ---------- calculate reward (more distance == more reward)
-        robot_pos = game.get_robot_pos(game.robot_id)
-        distance = np.linalg.norm(np.array(robot_pos) - np.array(self.episode_start_pos))
-        reward = abs(distance) * 0.1
+        # ---------- calculate reward
+        reward = 1
         # but if dead, then 0
         if done:
             reward = 0
+
+        # ---------- save the episode rewards
+        self.episode_rewards.append(reward)
         
+        # ---------- save the episode images
         robot_img = game.show_robot_current_image(game.robot_id)
         robot_img = np.array(robot_img) # (480, 640, 4)
         robot_img = robot_img.transpose(2, 0, 1) # (4, 480, 640)
         self.episode_robot_imgs.append(robot_img)
-        wandb.log({
-            "reward": reward,
-            "distance": distance,
-        })
 
         return obs, reward, done, {}
 
@@ -99,8 +97,10 @@ class AvoidTheRainEnv(gym.Env):
             wandb.log({
                 "episode": self.global_episode,
                 "robot_imgs": wandb.Video(np.array(self.episode_robot_imgs), fps=20),
+                "rewards": np.sum(self.episode_rewards),
             })
             self.episode_robot_imgs = []
+            self.episode_rewards = []
 
         # ---------- determine whether to show simulation or not
         user_dont_want_to_show_simulation = self.show_simulation_at_every_episode == -1
@@ -115,7 +115,6 @@ class AvoidTheRainEnv(gym.Env):
         self.global_episode += 1
         self.simulation_step = 0
         game.reset_all(self.render_mode)
-        self.episode_start_pos = game.get_robot_pos(game.robot_id)
         if not game.robot_id:
             return None
         else:
