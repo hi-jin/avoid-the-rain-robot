@@ -168,6 +168,25 @@ def update_camera(robot_id):
     return rgb_img
 
 
+def show_robot_current_image(robot_id):
+    robot_pos = get_robot_pos(robot_id)
+    camera_eye_position = [robot_pos[0] + 3, robot_pos[1] + 3, robot_pos[2] + 3]
+    camera_target_position = [robot_pos[0], robot_pos[1], robot_pos[2]]
+
+    view_matrix = p.computeViewMatrix(camera_eye_position, camera_target_position, [0, 0, 1])
+    fov = 60
+    aspect = 640 / 480
+    near_plane = 0.1
+    far_plane = 100
+    projection_matrix = p.computeProjectionMatrixFOV(fov, aspect, near_plane, far_plane)
+
+    width, height, rgb_img, depth_img, seg_img = p.getCameraImage(
+        640, 480, view_matrix, projection_matrix, renderer=p.ER_BULLET_HARDWARE_OPENGL
+    )
+
+    return rgb_img
+
+
 if __name__ == "__main__":
     reset_all("rgb_array")
 
@@ -183,7 +202,8 @@ if __name__ == "__main__":
 
         # 카메라 업데이트
         if rendering_step % 3 == 0:
-            rgb_img = update_camera(robot_id)
+            # rgb_img = update_camera(robot_id)
+            robot_current = show_robot_current_image(robot_id)
 
         # move test
         # move_robot_wheel(robot_id, 50, 50)
