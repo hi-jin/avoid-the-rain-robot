@@ -5,6 +5,8 @@ Welcome to the Robot RL Agent project! This repository showcases a reinforcement
 >[!WARNING]
 > This repository is still under active development.
 
+![image](https://github.com/hi-jin/avoid-the-rain-robot/assets/51053567/eb7ddda7-a8df-4ec2-992c-423a9afdf3d9)
+
 ## Environment Details 🌍
 
 ### Observation Space 👁️
