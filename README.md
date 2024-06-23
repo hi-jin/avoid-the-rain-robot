@@ -2,6 +2,9 @@
 
 Welcome to the Robot RL Agent project! This repository showcases a reinforcement learning agent trained to navigate and avoid falling raindrops. Below are key insights and considerations from the development process.
 
+>[!WARNING]
+> This repository is still under active development.
+
 ## Environment Details 🌍
 
 ### Observation Space 👁️
