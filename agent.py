@@ -25,7 +25,7 @@ import stable_baselines3 as sb3
 import rain_game as game
 import wandb
 from wandb.integration.sb3 import WandbCallback
-from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
+from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 
@@ -49,22 +49,14 @@ class AvoidTheRainEnv(gym.Env):
             dtype=np.uint8,
         )
 
-        # --------- define camera related settings
-        self.simulation_step = 0
-        self.update_on_every = 3
-
         # --------- my variables
         self.global_episode = 0
         self.show_simulation_at_every_episode = show_simulation_at_every_episode
         self.episode_rewards = []
 
     def step(self, action: np.ndarray):
-        self.simulation_step += 1
-        while self.simulation_step % self.update_on_every != 0:
-            game.p.stepSimulation()
-            self.simulation_step += 1
-
         # ---------- step the game
+        game.p.stepSimulation()
         obs = game.update_camera(game.robot_id)
         obs = np.array(obs)  # (480, 640, 4)
         obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
@@ -79,10 +71,10 @@ class AvoidTheRainEnv(gym.Env):
                 done = True
 
         # ---------- calculate reward
-        reward = 1
+        reward = self.calculate_reward(left, right)
         # but if dead, then 0
         if done:
-            reward = 0
+            reward = -100
 
         # ---------- save the episode rewards
         self.episode_rewards.append(reward)
@@ -101,7 +93,6 @@ class AvoidTheRainEnv(gym.Env):
 
         # ---------- reset the game
         self.global_episode += 1
-        self.simulation_step = 0
         game.reset_all(self.render_mode)
         if not game.robot_id:
             return None, {}
@@ -113,6 +104,31 @@ class AvoidTheRainEnv(gym.Env):
         robot_img = np.array(robot_img)  # (480, 640, 4)
         return robot_img
 
+    def calculate_reward(self, left, right):
+        base_reward = 1  # Base reward for staying alive
+
+        # Reward for movement
+        movement_reward = abs(left) + abs(right)
+
+        # Reward for changing direction
+        direction_change_reward = abs(left - right)
+
+        # Penalty for staying still
+        stillness_penalty = -1 if abs(left) < 1 and abs(right) < 1 else 0
+
+        # Combine rewards
+        total_reward = base_reward + 0.1 * movement_reward + 0.2 * direction_change_reward + stillness_penalty
+
+        return total_reward
+
+
+def make_env():
+    def _init():
+        env = AvoidTheRainEnv(show_simulation_at_every_episode=-1)
+        return Monitor(env)
+
+    return _init
+
 
 def train():
     run = wandb.init(
@@ -123,12 +139,18 @@ def train():
         save_code=True,
     )
 
-    env = AvoidTheRainEnv(show_simulation_at_every_episode=-1)
-    env = Monitor(env)
-    vec_env = DummyVecEnv([lambda: env])
+    num_envs = 4
+    vec_env = SubprocVecEnv([make_env() for _ in range(num_envs)])
     vec_env.render_mode = "rgb_array"
     recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % 100000 == 0, video_length=1000)
-    model = sb3.PPO("CnnPolicy", recorder, verbose=1, tensorboard_log=f"./runs/{run.id}")
+    model = sb3.PPO(
+        "CnnPolicy",
+        recorder,
+        verbose=1,
+        tensorboard_log=f"./runs/{run.id}",
+        ent_coef=0.01,
+        n_steps=2048 // num_envs,
+    )
     model.learn(
         total_timesteps=1000000,
         callback=WandbCallback(
@@ -154,8 +176,8 @@ def test():
 
 
 if __name__ == "__main__":
-    # train()
-    try:
-        test()
-    except Exception as e:
-        print(e)
+    train()
+    # try:
+    #     test()
+    # except Exception as e:
+    #     print(e)
