@@ -73,7 +73,7 @@ class AvoidTheRainEnv(gym.Env):
         obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
 
         # ---------- calculate reward
-        reward = self.calculate_reward(left, right)
+        reward = self.calculate_reward(left, right, is_simple=True)
         if done:
             reward = 0
 
@@ -105,7 +105,10 @@ class AvoidTheRainEnv(gym.Env):
         robot_img = np.array(robot_img)  # (480, 640, 4)
         return robot_img
 
-    def calculate_reward(self, left, right):
+    def calculate_reward(self, left, right, is_simple=True):
+        if is_simple:
+            return 1
+
         base_reward = 1  # Base reward for staying alive
 
         # Reward for movement
