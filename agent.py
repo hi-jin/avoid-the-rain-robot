@@ -180,8 +180,8 @@ def test():
 
 
 if __name__ == "__main__":
-    train()
-    # try:
-    #     test()
-    # except Exception as e:
-    #     print(e)
+    try:
+        train()
+        # test()
+    except Exception as e:
+        print(e)
