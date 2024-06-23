@@ -55,26 +55,27 @@ class AvoidTheRainEnv(gym.Env):
         self.episode_rewards = []
 
     def step(self, action: np.ndarray):
-        # ---------- step the game
-        game.p.stepSimulation()
-        obs = game.update_camera(game.robot_id)
-        obs = np.array(obs)  # (480, 640, 4)
-        obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
+        # --------- do action
         left = action[0]
         right = action[1]
 
         game.move_robot_wheel(game.robot_id, left, right)
+        game.p.stepSimulation()
         match game.game_step():
             case game.GameState.ALIVE:
                 done = False
             case game.GameState.DEAD:
                 done = True
 
+        # ---------- get obs
+        obs = game.update_camera(game.robot_id)
+        obs = np.array(obs)  # (480, 640, 4)
+        obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
+
         # ---------- calculate reward
         reward = self.calculate_reward(left, right)
-        # but if dead, then 0
         if done:
-            reward = -100
+            reward = 0
 
         # ---------- save the episode rewards
         self.episode_rewards.append(reward)
@@ -139,10 +140,10 @@ def train():
         save_code=True,
     )
 
-    num_envs = 4
+    num_envs = 8
     vec_env = SubprocVecEnv([make_env() for _ in range(num_envs)])
     vec_env.render_mode = "rgb_array"
-    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % 100000 == 0, video_length=1000)
+    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % 50000 == 0, video_length=1000)
     model = sb3.PPO(
         "CnnPolicy",
         recorder,
