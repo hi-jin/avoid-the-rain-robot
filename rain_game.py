@@ -165,7 +165,7 @@ def update_camera(robot_id):
         640, 480, view_matrix, projection_matrix, renderer=p.ER_BULLET_HARDWARE_OPENGL
     )
 
-    return rgb_img
+    return depth_img
 
 
 def show_robot_current_image(robot_id):

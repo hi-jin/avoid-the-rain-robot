@@ -29,6 +29,9 @@ from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 
+ACTION_SCALE = 50
+
+
 class AvoidTheRainEnv(gym.Env):
     def __init__(
         self,
@@ -38,15 +41,24 @@ class AvoidTheRainEnv(gym.Env):
 
         # --------- define spaces for rl algorithm
         self.action_space = gym.spaces.Box(
-            low=-100,
-            high=100,
+            low=-1,
+            high=1,
             shape=(2,),
         )
-        self.observation_space = gym.spaces.Box(
-            low=0,
-            high=255,
-            shape=(4, 480, 640),
-            dtype=np.uint8,
+        self.observation_space = gym.spaces.Dict(
+            {
+                "depth": gym.spaces.Box(
+                    low=0,
+                    high=255,
+                    shape=(480, 640),
+                    dtype=np.uint8,
+                ),
+                "prev_action": gym.spaces.Box(
+                    low=-1,
+                    high=1,
+                    shape=(2,),
+                )
+            }
         )
 
         # --------- my variables
@@ -56,6 +68,7 @@ class AvoidTheRainEnv(gym.Env):
 
     def step(self, action: np.ndarray):
         # --------- do action
+        action *= ACTION_SCALE
         left = action[0]
         right = action[1]
 
@@ -70,10 +83,13 @@ class AvoidTheRainEnv(gym.Env):
         # ---------- get obs
         obs = game.update_camera(game.robot_id)
         obs = np.array(obs)  # (480, 640, 4)
-        obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
+        obs = {
+            "depth": obs,
+            "prev_action": action / ACTION_SCALE,
+        }
 
         # ---------- calculate reward
-        reward = self.calculate_reward(left, right, is_simple=False)
+        reward = self.calculate_reward(left, right)
         if done:
             reward = 0
 
@@ -98,27 +114,20 @@ class AvoidTheRainEnv(gym.Env):
         if not game.robot_id:
             return None, {}
         else:
-            return game.update_camera(game.robot_id).transpose(2, 0, 1), {}
+            obs = game.update_camera(game.robot_id)
+            obs = {
+                "depth": obs,
+                "prev_action": np.array([0, 0], dtype=np.float32),
+            }
+            return obs, {}
 
     def render(self, mode="rgb_array"):
         robot_img = game.show_robot_current_image(game.robot_id)
         robot_img = np.array(robot_img)  # (480, 640, 4)
         return robot_img
 
-    def calculate_reward(self, left, right, is_simple=True):
-        if is_simple:
-            return 1
-
-        # Base reward for staying alive
-        base_reward = 1
-
-        # Penalty for staying still
-        stillness_penalty = -0.5 if abs(left) < 1 and abs(right) < 1 else 0
-
-        # Combine rewards
-        total_reward = base_reward + stillness_penalty
-
-        return total_reward
+    def calculate_reward(self, left, right):
+        return 1
 
 
 def make_env():
@@ -141,9 +150,14 @@ def train():
     num_envs = 4
     vec_env = SubprocVecEnv([make_env() for _ in range(num_envs)])
     vec_env.render_mode = "rgb_array"
-    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % (50000 // num_envs) == 0, video_length=1000)
+    recorder = VecVideoRecorder(
+        vec_env,
+        "videos",
+        record_video_trigger=lambda x: x % (50000 // num_envs) == 0,
+        video_length=1000,
+    )
     model = sb3.PPO(
-        "CnnPolicy",
+        "MultiInputPolicy",
         recorder,
         verbose=1,
         tensorboard_log=f"./runs/{run.id}",
@@ -168,10 +182,10 @@ def test():
     done = False
     while not done:
         action, _ = model.predict(obs)
-        # print(action)
-        action = (50, 50)
+        action *= ACTION_SCALE
+        # action = (50, 50)
         obs, reward, done, truncation, info = env.step(action)
-        print(obs)
+        # print(obs)
 
 
 if __name__ == "__main__":
