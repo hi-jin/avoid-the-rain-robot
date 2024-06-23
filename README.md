@@ -31,6 +31,10 @@ Reward shaping significantly influenced agent behavior, presenting both benefits
 - 🎯 **Clear Objectives**: Define precise goals to avoid misalignment
 - 🧪 **Extensive Testing**: Evaluate agent performance in various scenarios
 
+## Design Considerations 🎨
+
+While aiming for more dynamic movement than shown in the video below, I encountered a challenge: without proper reward function design, the agent would often resort to rapidly spinning its wheels without actually making efforts to avoid the rain. This highlighted the critical importance of thoughtful reward shaping to encourage desired behaviors while discouraging unproductive actions.
+
 ## Conclusion 🏁
 
 Developing an effective raindrop-avoiding RL agent requires:
@@ -47,5 +51,7 @@ For questions or suggestions, please don't hesitate to reach out.
 *This README incorporates insights from the Robot RL Agent project development.*
 
 ---
+
+https://github.com/hi-jin/avoid-the-rain-robot/assets/51053567/a4b70bfc-552e-41da-9435-8b12f3bb2318
 
 ![Agent Performance](https://github.com/hi-jin/avoid-the-rain-robot/assets/51053567/0798dd1b-ec4a-40df-bb2d-b8ce7d2c510a)
