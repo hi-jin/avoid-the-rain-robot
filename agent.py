@@ -73,7 +73,7 @@ class AvoidTheRainEnv(gym.Env):
         obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
 
         # ---------- calculate reward
-        reward = self.calculate_reward(left, right, is_simple=True)
+        reward = self.calculate_reward(left, right, is_simple=False)
         if done:
             reward = 0
 
@@ -109,19 +109,14 @@ class AvoidTheRainEnv(gym.Env):
         if is_simple:
             return 1
 
-        base_reward = 1  # Base reward for staying alive
-
-        # Reward for movement
-        movement_reward = abs(left) + abs(right)
-
-        # Reward for changing direction
-        direction_change_reward = abs(left - right)
+        # Base reward for staying alive
+        base_reward = 1
 
         # Penalty for staying still
-        stillness_penalty = -1 if abs(left) < 1 and abs(right) < 1 else 0
+        stillness_penalty = -0.5 if abs(left) < 1 and abs(right) < 1 else 0
 
         # Combine rewards
-        total_reward = base_reward + 0.1 * movement_reward + 0.2 * direction_change_reward + stillness_penalty
+        total_reward = base_reward + stillness_penalty
 
         return total_reward
 
@@ -143,10 +138,10 @@ def train():
         save_code=True,
     )
 
-    num_envs = 8
+    num_envs = 4
     vec_env = SubprocVecEnv([make_env() for _ in range(num_envs)])
     vec_env.render_mode = "rgb_array"
-    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % 50000 == 0, video_length=1000)
+    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % (50000 // num_envs) == 0, video_length=1000)
     model = sb3.PPO(
         "CnnPolicy",
         recorder,
