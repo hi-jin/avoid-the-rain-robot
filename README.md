@@ -2,6 +2,18 @@
 
 Welcome to the Robot RL Agent project! This repository showcases a reinforcement learning agent trained to navigate and avoid falling raindrops. Below are key insights and considerations from the development process.
 
+## Environment Details 🌍
+
+### Observation Space 👁️
+The agent receives two types of observations:
+- **Depth Image**: A visual representation of the environment
+- **Last Action**: The previous action taken by the agent
+
+### Action Space 🎮
+The agent controls its movement through velocity adjustments:
+- **Velocity Range**: -50 to 50
+- This allows the agent to move forward, backward, and turn with varying speeds
+
 ## Key Insights 🔑
 
 ### 1. Multi Vec Environments 🌐
