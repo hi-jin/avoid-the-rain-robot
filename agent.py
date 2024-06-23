@@ -19,13 +19,14 @@
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  """
 
+import gymnasium as gym
 import numpy as np
 import stable_baselines3 as sb3
-import gym
-import gym.spaces
 import rain_game as game
 import wandb
 from wandb.integration.sb3 import WandbCallback
+from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
+from stable_baselines3.common.monitor import Monitor
 
 
 class AvoidTheRainEnv(gym.Env):
@@ -36,11 +37,16 @@ class AvoidTheRainEnv(gym.Env):
         super(AvoidTheRainEnv, self).__init__()
 
         # --------- define spaces for rl algorithm
-        self.action_space = gym.spaces.MultiDiscrete([3, 3])
+        self.action_space = gym.spaces.Box(
+            low=-100,
+            high=100,
+            shape=(2,),
+        )
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(480, 640, 4),
+            shape=(4, 480, 640),
+            dtype=np.uint8,
         )
 
         # --------- define camera related settings
@@ -50,7 +56,6 @@ class AvoidTheRainEnv(gym.Env):
         # --------- my variables
         self.global_episode = 0
         self.show_simulation_at_every_episode = show_simulation_at_every_episode
-        self.episode_robot_imgs = []
         self.episode_rewards = []
 
     def step(self, action: np.ndarray):
@@ -61,11 +66,10 @@ class AvoidTheRainEnv(gym.Env):
 
         # ---------- step the game
         obs = game.update_camera(game.robot_id)
-        left = action[0] - 1
-        right = action[1] - 1
-
-        left *= 50
-        right *= 50
+        obs = np.array(obs)  # (480, 640, 4)
+        obs = obs.transpose(2, 0, 1)  # (4, 480, 640)
+        left = action[0]
+        right = action[1]
 
         game.move_robot_wheel(game.robot_id, left, right)
         match game.game_step():
@@ -82,26 +86,10 @@ class AvoidTheRainEnv(gym.Env):
 
         # ---------- save the episode rewards
         self.episode_rewards.append(reward)
-        
-        # ---------- save the episode images
-        robot_img = game.show_robot_current_image(game.robot_id)
-        robot_img = np.array(robot_img) # (480, 640, 4)
-        robot_img = robot_img.transpose(2, 0, 1) # (4, 480, 640)
-        self.episode_robot_imgs.append(robot_img)
 
-        return obs, reward, done, {}
+        return obs, reward, done, False, {}
 
-    def reset(self):
-        # ---------- save the episode images to video
-        if self.episode_robot_imgs:
-            wandb.log({
-                "episode": self.global_episode,
-                "robot_imgs": wandb.Video(np.array(self.episode_robot_imgs), fps=20),
-                "rewards": np.sum(self.episode_rewards),
-            })
-            self.episode_robot_imgs = []
-            self.episode_rewards = []
-
+    def reset(self, seed=None):
         # ---------- determine whether to show simulation or not
         user_dont_want_to_show_simulation = self.show_simulation_at_every_episode == -1
         should_show = self.global_episode % self.show_simulation_at_every_episode == 0
@@ -116,16 +104,18 @@ class AvoidTheRainEnv(gym.Env):
         self.simulation_step = 0
         game.reset_all(self.render_mode)
         if not game.robot_id:
-            return None
+            return None, {}
         else:
-            return game.update_camera(game.robot_id)
+            return game.update_camera(game.robot_id).transpose(2, 0, 1), {}
 
-    def render(self):
-        pass
+    def render(self, mode="rgb_array"):
+        robot_img = game.show_robot_current_image(game.robot_id)
+        robot_img = np.array(robot_img)  # (480, 640, 4)
+        return robot_img
 
 
 def train():
-    wandb.init(
+    run = wandb.init(
         project="avoid-the-rain",
         name="ppo",
         monitor_gym=True,
@@ -134,7 +124,11 @@ def train():
     )
 
     env = AvoidTheRainEnv(show_simulation_at_every_episode=-1)
-    model = sb3.PPO("MlpPolicy", env, verbose=1)
+    env = Monitor(env)
+    vec_env = DummyVecEnv([lambda: env])
+    vec_env.render_mode = "rgb_array"
+    recorder = VecVideoRecorder(vec_env, "videos", record_video_trigger=lambda x: x % 100000 == 0, video_length=1000)
+    model = sb3.PPO("CnnPolicy", recorder, verbose=1, tensorboard_log=f"./runs/{run.id}")
     model.learn(
         total_timesteps=1000000,
         callback=WandbCallback(
@@ -143,20 +137,25 @@ def train():
             verbose=2,
         ),
     )
-    model.save("avoid_the_rain")
+    run.finish()
 
 
 def test():
     env = AvoidTheRainEnv(show_simulation_at_every_episode=1)
     model = sb3.PPO.load("./models/model.zip")
-    obs = env.reset()
+    obs, _ = env.reset()
     done = False
     while not done:
-        action, _states = model.predict(obs)
-        print(action)
-        obs, reward, done, info = env.step(action)
+        action, _ = model.predict(obs)
+        # print(action)
+        action = (50, 50)
+        obs, reward, done, truncation, info = env.step(action)
+        print(obs)
 
 
 if __name__ == "__main__":
-    train()
-    # test()
+    # train()
+    try:
+        test()
+    except Exception as e:
+        print(e)

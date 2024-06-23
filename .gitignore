@@ -1,3 +1,5 @@
 wandb
 **/*.zip
-
+**/__pycache__
+runs/
+videos/
